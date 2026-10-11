@@ -1,5 +1,5 @@
 ---
-name: edu-pm-workflow
+name: edu-pm-prd
 description: "Product management workflow for producing PRDs, interactive HTML prototypes, flowcharts, acceptance checklists, demand analysis, and data reports. Use when the user describes a product requirement, asks for PRD/prototype/flowchart/checklist/data-analysis output, or wants to continue this PM workflow."
 user-invocable: true
 ---
@@ -18,7 +18,7 @@ Find this skill's init script if needed:
 
 ```bash
 find .agents/skills "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.cursor/skills" \
-  -path "*/edu-pm-workflow/scripts/init.sh" -print -quit 2>/dev/null
+  -path "*/edu-pm-prd/scripts/init.sh" -print -quit 2>/dev/null
 ```
 
 ## Workflow Routing
@@ -97,11 +97,11 @@ scripts/                  [shared] prototype export service
 启动原型导出服务.command     [shared] double-click to start PNG export service
 .handoff/                 [shared] cross-session handoff files
 .agents/workflows/        [shared] editable workflow definitions
-.agents/skills/edu-pm-workflow/assets/
+.agents/skills/edu-pm-prd/assets/
   templates/prd-content.html   PRD body skeleton — copy and fill, do not hand-write
   scripts/validate_prd.py      mechanical PRD validation — must pass before delivery
 ```
 
 ## Customization
 
-Edit `.agents/workflows/*.md` for project-specific behavior. Edit the bundled files under `.agents/skills/edu-pm-workflow/assets/workflows/` only when changing the reusable skill template for future installs.
+Edit `.agents/workflows/*.md` for project-specific behavior. Edit the bundled files under `.agents/skills/edu-pm-prd/assets/workflows/` only when changing the reusable skill template for future installs.

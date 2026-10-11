@@ -1827,7 +1827,7 @@ const EDGES = [
 > ```sh
 > python3 scripts/validate_prd.py [需求名/需求文档/需求名-PRD.html]
 > # 项目没跑过 init.sh 时，直接用 skill 目录里的那份：
-> # python3 .agents/skills/edu-pm-workflow/assets/scripts/validate_prd.py …
+> # python3 .agents/skills/edu-pm-prd/assets/scripts/validate_prd.py …
 > ```
 > **务必把 PRD 路径作为参数传进去**——文件存在性检查（原型截图是否真的生成了）只有拿到 PRD 路径才能跑；不带参数只做纯结构检查，会放过"截图漏生成"这类问题。不带参数会自动扫描当前目录下所有 `*-PRD.html`。它查的是**机械可判定**的部分：核心章节是否存在、项目信息/版本记录是否分开、有无独立异常章节、章节编号连续性、六张表的表头与列数、项目信息是否双列、详细方案每行 `data-preview`、原型列是否有内容、描述列是否用 `.desc-block`（含 `<br>` 硬换行检测）、埋点 snake_case 与六列、`#prdContent` 内是否有正文 `<style>`、需求目标表头。
 >
