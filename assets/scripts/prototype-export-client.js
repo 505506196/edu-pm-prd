@@ -1,0 +1,251 @@
+(function () {
+  var SERVER = window.PROTOTYPE_EXPORT_SERVER || 'http://localhost:8765';
+  var LAUNCHER = window.PROTOTYPE_EXPORT_LAUNCHER || 'http://localhost:8766';
+  var running = false;
+
+  function isExportButton(target) {
+    if (!target || target.nodeType !== 1) return null;
+    var button = target.closest('button, [role="button"], a');
+    if (!button) return null;
+    var text = (button.textContent || '').trim();
+    var matched = button.id === 'exportFab'
+      || button.classList.contains('export-fab')
+      || button.classList.contains('export-btn')
+      || text.indexOf('一键导出所有截图') !== -1
+      || text.indexOf('导出PNG截图') !== -1;
+    return matched ? button : null;
+  }
+
+  function findExportButton() {
+    return document.getElementById('exportFab')
+      || document.querySelector('.export-fab, .export-btn')
+      || Array.from(document.querySelectorAll('button')).find(isExportButton);
+  }
+
+  function setButton(button, text, background, disabled) {
+    if (!button) return;
+    button.textContent = text;
+    if (background !== undefined) button.style.background = background;
+    button.style.opacity = disabled ? '0.75' : '1';
+    button.style.pointerEvents = disabled ? 'none' : '';
+  }
+
+  function currentHtmlPath() {
+    return decodeURIComponent(window.location.pathname || '');
+  }
+
+  function currentViewport() {
+    return {
+      width: Math.max(1, Math.round(window.innerWidth || document.documentElement.clientWidth || 1440)),
+      height: Math.max(1, Math.round(window.innerHeight || document.documentElement.clientHeight || 900))
+    };
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  async function fetchStatus() {
+    var response = await fetch(SERVER + '/api/status?ts=' + Date.now(), { cache: 'no-store' });
+    if (!response.ok) throw new Error('导出服务状态读取失败');
+    return response.json();
+  }
+
+  async function tryLaunchViaLauncher(button) {
+    // 通过 launcher 唤起完整导出服务（仅本地 8766 端口转发到 .command）
+    try {
+      setButton(button, '正在唤起导出服务...', undefined, true);
+      var resp = await fetch(LAUNCHER + '/api/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}'
+      });
+      if (!resp.ok) return false;
+      var data = await resp.json().catch(function () { return {}; });
+      return !!data.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  async function waitForServerReady(button) {
+    // 第一次：8 秒以内能 ping 通就直接返回
+    var first = await tryStatus(button, 8000);
+    if (first) return first;
+
+    // 否则尝试 launcher 唤起（如果 launcher 没装也无所谓）
+    var launched = await tryLaunchViaLauncher(button);
+    if (launched) {
+      setButton(button, '导出服务启动中...', undefined, true);
+      // launcher 拉起 .command 后，Playwright/Chromium 首次冷启动会比较慢，给 30s
+      var second = await tryStatus(button, 30000);
+      if (second) return second;
+    }
+
+    throw new Error('导出服务未启动');
+  }
+
+  async function tryStatus(button, timeoutMs) {
+    var deadline = Date.now() + timeoutMs;
+    var attempt = 0;
+    while (Date.now() < deadline) {
+      attempt += 1;
+      try {
+        return await fetchStatus();
+      } catch (error) {
+        setButton(button, attempt === 1 ? '正在连接导出服务...' : '等待导出服务启动...', undefined, true);
+        await sleep(900);
+      }
+    }
+    return null;
+  }
+
+  async function pollStatus(button) {
+    var lastStatus = null;
+    while (true) {
+      var status = await fetchStatus();
+      lastStatus = status;
+
+      if (status.error) throw new Error(status.error);
+
+      var progress = status.progress || 0;
+      var total = status.total || 0;
+      var current = status.current || '截图中...';
+      setButton(button, total ? ('正在导出 ' + progress + '/' + total + ' · ' + current) : current, undefined, true);
+
+      if (status.done) return status;
+      await new Promise(function (resolve) { setTimeout(resolve, 900); });
+    }
+  }
+
+  async function exportViaServer(button) {
+    if (running) return;
+    running = true;
+
+    var originalText = button ? button.textContent : '';
+    var originalBackground = button ? button.style.background : '';
+
+    try {
+      setButton(button, '正在连接导出服务...', undefined, true);
+      await waitForServerReady(button);
+
+      var response = await fetch(SERVER + '/api/screenshot', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          path: currentHtmlPath(),
+          url: window.location.href,
+          title: document.title || '',
+          viewport: currentViewport()
+        })
+      });
+
+      var started = await response.json().catch(function () { return {}; });
+      if (!response.ok || started.error) {
+        throw new Error(started.error || '导出服务启动失败');
+      }
+
+      var finalStatus = await pollStatus(button);
+      var successCount = finalStatus.success_count || 0;
+      var total = finalStatus.total || successCount;
+      setButton(button, '已导出 ' + successCount + '/' + total + ' 张 PNG', '#22c55e', false);
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage('export-success', '*');
+      }
+
+      setTimeout(function () {
+        setButton(button, originalText, originalBackground, false);
+      }, 2600);
+    } catch (error) {
+      console.error('[prototype export]', error);
+      setButton(button, '导出服务未启动', '#ef4444', false);
+      window.alert('导出服务还没启动成功。\n\n通常 launcher 会自动唤起；若失败请双击项目根目录的「启动原型导出服务.command」，再点一次导出。');
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage('export-error', '*');
+      }
+      setTimeout(function () {
+        setButton(button, originalText, originalBackground, false);
+      }, 3200);
+    } finally {
+      running = false;
+    }
+  }
+
+  // ── 单页取图：给 PRD「一键复制全文」把原型 iframe 换成 base64 图片 ──────────
+  // file:// 下浏览器既不能 fetch 本地 PNG、canvas 也会被污染，base64 只能由本地服务下发。
+  var readyPromise = null;
+
+  function ensureExportServerReady() {
+    // 并发取多页时只做一次唤起/等待；失败后允许下次点击重试
+    if (!readyPromise) {
+      readyPromise = waitForServerReady(null).catch(function (error) {
+        readyPromise = null;
+        throw error;
+      });
+    }
+    return readyPromise;
+  }
+
+  async function snapshotPrototypeViaServer(src, opts) {
+    if (!src) throw new Error('缺少 iframe src');
+    opts = opts || {};
+    await ensureExportServerReady();
+
+    var response = await fetch(SERVER + '/api/snapshot', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        src: src,
+        base: opts.base || currentHtmlPath(),
+        scale: opts.scale
+      })
+    });
+
+    var data = await response.json().catch(function () { return {}; });
+    if (!response.ok || !data.ok || !data.dataUrl) {
+      throw new Error(data.error || ('取图失败（HTTP ' + response.status + '）'));
+    }
+    return data;
+  }
+
+  // 本地 <img>（详细方案「原型」列的截图版）→ base64，同样只能由服务下发
+  async function inlineAssetViaServer(src, opts) {
+    if (!src) throw new Error('缺少 img src');
+    opts = opts || {};
+    await ensureExportServerReady();
+
+    var response = await fetch(SERVER + '/api/asset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ src: src, base: opts.base || currentHtmlPath() })
+    });
+
+    var data = await response.json().catch(function () { return {}; });
+    if (!response.ok || !data.ok || !data.dataUrl) {
+      throw new Error(data.error || ('内联图片失败（HTTP ' + response.status + '）'));
+    }
+    return data;
+  }
+
+  document.addEventListener('click', function (event) {
+    var button = isExportButton(event.target);
+    if (!button) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.stopImmediatePropagation();
+    exportViaServer(button);
+  }, true);
+
+  window.addEventListener('message', function (event) {
+    if (event.data !== 'trigger-export') return;
+    event.preventDefault && event.preventDefault();
+    event.stopPropagation && event.stopPropagation();
+    event.stopImmediatePropagation && event.stopImmediatePropagation();
+    exportViaServer(findExportButton());
+  }, true);
+
+  window.exportPrototypeViaServer = exportViaServer;
+  window.snapshotPrototypeViaServer = snapshotPrototypeViaServer;
+  window.inlineAssetViaServer = inlineAssetViaServer;
+  window.ensureExportServerReady = ensureExportServerReady;
+})();
