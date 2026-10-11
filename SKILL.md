@@ -1,10 +1,10 @@
 ---
 name: edu-pm-prd
-description: "Product management workflow for producing PRDs, interactive HTML prototypes, flowcharts, acceptance checklists, demand analysis, and data reports. Use when the user describes a product requirement, asks for PRD/prototype/flowchart/checklist/data-analysis output, or wants to continue this PM workflow."
+description: "Product management workflow for producing PRDs, interactive HTML prototypes, flowcharts, acceptance checklists, demand analysis, and data reports. Use when the user describes a product requirement, asks for PRD/prototype/flowchart/checklist/data-analysis output, or wants to continue this edu-pm-prd workflow."
 user-invocable: true
 ---
 
-# PM Workflow Skill
+# edu-pm-prd Skill
 
 This skill turns product requirements into working artifacts: PRD HTML, interactive prototype HTML, flowchart HTML, acceptance checklist, demand analysis, and data reports. It is designed for product work across different business domains and product types.
 

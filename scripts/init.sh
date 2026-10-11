@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # =================================================================
-# PM Workflow Project Initializer
+# edu-pm-prd Project Initializer
 #
 # Scaffolds the directory structure and installs workflow files into
 # the current working directory.
@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-echo "🚀 Initializing PM Workflow..."
+echo "🚀 Initializing edu-pm-prd..."
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SKILL_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -121,7 +121,7 @@ done
 
 echo ""
 echo "=========================================="
-echo "✅ PM Workflow initialized!"
+echo "✅ edu-pm-prd initialized!"
 echo "=========================================="
 echo ""
 echo "📂 Workflow files:  .agents/workflows/"
