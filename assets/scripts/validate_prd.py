@@ -288,6 +288,33 @@ def validate_prd(content, path=None):
         if heads != ["用户结果", "衡量指标", "统计口径", "预期方向", "目标值"]:
             errors.append("goal-table 表头必须为：用户结果、衡量指标、统计口径、预期方向、目标值")
 
+    # ---- 11. 双栏预览的 CSS 布局正确性（§2.6 ②）----
+    # 第 8 节查的是「函数在不在」，但函数齐全不等于缩放真的работает：CSS 这三处写错，
+    # scalePreview() 照样被架空，而函数存在性检查会放行。
+    #
+    # 踩坑实例：某 PRD 的 .device-shell 不给宽高、iframe 写 width/height:100% ——
+    # 百分比在父级无确定尺寸时无法解析，iframe 退回 replaced element 默认的
+    # 300×150，再被 flex 居中，于是原型缩成小方块浮在面板中央、四周全是留白。
+    # 这几项必须**限定在对应 CSS 规则块内**再查，不能全文搜：实测被自己的注释骗过——
+    # 注释里写着 "flex:0 0 auto 不可省"，规则块里却漏了，全文搜照样命中、检查放行。
+    if "prototype-sidebar" in content:
+        wrapper_css = re.search(r"\.device-wrapper\s*\{([^}]*)\}", content)
+        frame_css = re.search(r"#prototypeFrame\s*\{([^}]*)\}", content)
+        if "deviceWrapper" not in content and "device-wrapper" not in content:
+            errors.append("双栏预览缺少 .device-wrapper 缩放包装层（§2.6 ①）")
+        elif not wrapper_css or not re.search(r"flex:\s*0\s+0\s+auto", wrapper_css.group(1)):
+            errors.append(
+                ".device-wrapper 规则里必须显式 flex:0 0 auto，"
+                "否则被 flex 压回面板宽度、放大等于白做（§2.6 ②）")
+        if not frame_css or not re.search(r"transform-origin:\s*top\s+left", frame_css.group(1)):
+            errors.append("#prototypeFrame 的 transform-origin 必须为 top left（§2.6 ②）")
+        if frame_css and re.search(r"(width|height):\s*100%", frame_css.group(1)):
+            errors.append(
+                "#prototypeFrame 不能用 width/height:100%，须由 scalePreview() 设 px"
+                "——父级无确定尺寸时百分比解析失败，iframe 会塌缩成 300×150（§2.6 ③）")
+        if not re.search(r"(?:const|let|var)\s+CATALOG\s*=", content):
+            errors.append("双栏预览缺少 CATALOG 页面逻辑尺寸配置（w/h），无法算缩放倍率（§2.6 ③）")
+
     if errors:
         raise ValueError("PRD 格式检查未通过：\n" + "\n".join(dict.fromkeys(errors)))
     return True
